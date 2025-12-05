@@ -11,7 +11,7 @@ A seamless integration between [Better Auth](https://better-auth.com) and [Insta
 ## Installation
 
 ```bash
-pnpm add @daveyplate/better-auth-instantdb@latest
+bun add better-auth-instantdb@latest
 ```
 
 ## Features
@@ -29,27 +29,30 @@ First you need to add the InstantDB Adapter to your Better Auth config.
 
 #### auth.ts
 ```typescript
-import { betterAuth } from 'better-auth'
-import { instantDBAdapter } from '@daveyplate/better-auth-instantdb'
-import { init } from "@instantdb/admin";
-import schema from "instant.schema";
+import { betterAuth } from "better-auth"
+import { instantDBAdapter } from "better-auth-instantdb"
+import { init } from "@instantdb/admin"
+import schema from "@/instant.schema"
 
 // Create InstantDB admin client
-const adminDb = init({
-    appId: process.env.INSTANT_APP_ID,
-    apiKey: process.env.INSTANT_API_KEY
-    schema
-});
+export const adminDb = init({
+  schema,
+  appId: process.env.VITE_INSTANT_APP_ID as string,
+  adminToken: process.env.INSTANT_ADMIN_TOKEN,
+  useDateObjects: true
+})
 
 // Create Better Auth instance with InstantDB adapter
 export const auth = betterAuth({
-    database: instantDBAdapter({
-        db: adminDb,
-        usePlural: true, // Optional: set to true if your schema uses plural table names
-        debugLogs: false  // Optional: set to true to see detailed logs
-    }),
-    // Other Better Auth configuration options
-    emailAndPassword: { enabled: true }
+  database: instantDBAdapter({
+    db: adminDb,
+    usePlural: true, // Optional: set to true if your schema uses plural table names
+    debugLogs: false  // Optional: set to true to see detailed logs
+  }),
+  // Other Better Auth configuration options
+  emailAndPassword: {
+    enabled: true
+  },
 })
 ```
 
@@ -59,11 +62,9 @@ Synchronize authentication state between Better Auth and InstantDB:
 
 #### providers.tsx
 ```typescript
-"use client"
-
-import { useSession } from '@/lib/auth-client'
-import { init } from '@instantdb/react'
-import { useInstantAuth } from '@daveyplate/better-auth-instantdb'
+import authClient from "@/lib/auth-client"
+import { init } from "@instantdb/react"
+import { useInstantAuth } from "better-auth-instantdb"
 
 // Initialize InstantDB client
 const db = init({ 
@@ -71,157 +72,26 @@ const db = init({
 })
 
 export function Providers({ children }) {
-    const { data: sessionData, isPending } = useSession()
-    
-    // Set up InstantDB auth sync with Better Auth
-    useInstantAuth({ 
-        db, 
-        sessionData,
-        isPending
-    })
-    
-    return (
-        // Your application code
+  return (
+      <>
+        <InstantAuth db={db} authClient={authClient} persistent />
+
         {children}
-    )
+      </>
+  )
 }
 ```
 
 ## InstantDB Schema and Permissions Setup
 
-⚠️ **Important**: You must manually create and configure the InstantDB schema and permissions files for this adapter to work correctly.
+⚠️ **Important**: You can now use Better Auth cli to generate InstantDB schema, but you must manually configure permissions, for now.
 
 ### 1. Create Schema File
 
-Create an `instant.schema.ts` file with the required entities for Better Auth:
+Run the following command in terminal:
 
-#### instant.schema.ts
-```typescript
-import { i } from "@instantdb/react";
-
-const _schema = i.schema({
-  entities: {
-    // System entities
-    $files: i.entity({
-      path: i.string().unique().indexed(),
-      url: i.any(),
-    }),
-    $users: i.entity({
-      email: i.string().unique().indexed(),
-    }),
-    // Authentication entities
-    users: i.entity({
-      createdAt: i.date(),
-      email: i.string().unique(),
-      emailVerified: i.boolean(),
-      image: i.string(),
-      name: i.string(),
-      updatedAt: i.date(),
-    }),
-    sessions: i.entity({
-      createdAt: i.date(),
-      expiresAt: i.date().indexed(),
-      ipAddress: i.string(),
-      token: i.string(),
-      updatedAt: i.date(),
-      userAgent: i.string(),
-      userId: i.string(),
-    }),
-    accounts: i.entity({
-      accessToken: i.string(),
-      accessTokenExpiresAt: i.date(),
-      accountId: i.string(),
-      createdAt: i.date(),
-      idToken: i.string(),
-      password: i.string(),
-      providerId: i.string(),
-      refreshToken: i.string(),
-      refreshTokenExpiresAt: i.date(),
-      scope: i.string(),
-      updatedAt: i.date(),
-      userId: i.string().indexed(),
-    }),
-    verifications: i.entity({
-      createdAt: i.date().indexed(),
-      expiresAt: i.date().indexed(),
-      identifier: i.string(),
-      updatedAt: i.date(),
-      value: i.string(),
-    }),
-    // Optional entities for additional features (public profile example)
-    profiles: i.entity({
-      createdAt: i.date(),
-      image: i.string(),
-      name: i.string(),
-      updatedAt: i.date(),
-    }),
-  },
-  links: {
-    // Required links for auth
-    users$user: {
-      forward: {
-        on: "users",
-        has: "one",
-        label: "$user",
-        onDelete: "cascade",
-      },
-      reverse: {
-        on: "$users",
-        has: "one",
-        label: "user",
-      },
-    },
-    sessionsUser: {
-      forward: {
-        on: "sessions",
-        has: "one",
-        label: "user",
-        onDelete: "cascade",
-      },
-      reverse: {
-        on: "users",
-        has: "many",
-        label: "sessions",
-      },
-    },
-    accountsUser: {
-      forward: {
-        on: "accounts",
-        has: "one",
-        label: "user",
-        onDelete: "cascade",
-      },
-      reverse: {
-        on: "users",
-        has: "many",
-        label: "accounts",
-      },
-    },
-    // Optional links (public profile example)
-    profilesUser: {
-      forward: {
-        on: "profiles",
-        has: "one",
-        label: "user",
-        onDelete: "cascade",
-      },
-      reverse: {
-        on: "users",
-        has: "one",
-        label: "profile",
-      },
-    },
-    // Add your custom links here
-  },
-});
-
-// This helps TypeScript display nicer intellisense
-type _AppSchema = typeof _schema;
-interface AppSchema extends _AppSchema {}
-const schema: AppSchema = _schema;
-
-export type { AppSchema };
-export default schema;
+```bash
+npx @better-auth/cli generate
 ```
 
 ### 2. Create Permissions File
@@ -328,7 +198,6 @@ Creates an adapter that allows Better Auth to use InstantDB as its database.
 | `db` | `InstantAdminDatabase` | (required) | An InstantDB admin client instance |
 | `usePlural` | `boolean` | `true` | Set to `false` if your schema uses singular table names |
 | `debugLogs` | `boolean` | `false` | Set to `true` to enable detailed logging |
-| `transactionHooks` | `Promise<TransactionChunk<any, any>[]>` | `undefined` | Custom hooks for create and update operations |
 
 ### `useInstantAuth({ db, useSession })`
 
@@ -339,64 +208,8 @@ A React hook that synchronizes authentication state between Better Auth and Inst
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `db` | `InstantReactWebDatabase` | An InstantDB client instance |
-| `useSession` | `function` | The `useSession` hook from Better Auth |
-
-### `useInstantAuth({ db, sessionData, isPending })`
-
-An alternative form of the React hook that synchronizes authentication state between Better Auth and InstantDB.
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `db` | `InstantReactWebDatabase` | An InstantDB client instance |
-| `sessionData` | `{ session: Session; user: User } \| null` | Session data from Better Auth |
-| `isPending` | `boolean` | Whether the session data is still loading |
-
-## Advanced Usage
-
-### Custom Transaction Hooks
-
-You can extend the adapter's behavior with custom transaction hooks:
-
-#### Sync public profile with user entity
-```typescript
-instantDBAdapter({
-    db,
-    usePlural: true,
-    transactionHooks: {
-        create: async ({ model, data }) => {
-            if (model === "users") {
-                const transactions = [
-                    db.tx.profiles[data.id]
-                        .update({
-                            name: data.name,
-                            image: data.image,
-                            createdAt: Date.now(),
-                            updatedAt: Date.now()
-                        })
-                        .link({ user: data.id })
-                ]
-
-                return transactions
-            }
-        },
-        update: async ({ model, update, where }) => {
-            if (model === "users") {
-                const result = await db.query({ profiles: { $: { where: parseWhere(where) } } })
-
-                return result.profiles.map((profile) =>
-                    db.tx.profiles[profile.id].update({
-                        name: update.name,
-                        image: update.image,
-                        updatedAt: Date.now()
-                    })
-                )
-            }
-        }
-    }
-})
-```
+| `authClient` | `AuthClient` | The `authClient` from Better Auth |
+| `persistent` | `boolean?` | Whether to enable offline persistence for session |
 
 ## License
 
