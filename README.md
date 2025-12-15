@@ -44,7 +44,7 @@ export const adminDb = init({
 
 // Create Better Auth instance with InstantDB adapter
 export const auth = betterAuth({
-  database: instantDBAdapter({
+  database: instantAdapter({
     db: adminDb,
     usePlural: true, // Optional: set to true if your schema uses plural table names
     debugLogs: false  // Optional: set to true to see detailed logs
@@ -187,7 +187,7 @@ export const db = init({
 
 ## API Reference
 
-### `instantDBAdapter(options)`
+### `instantAdapter(options)`
 
 Creates an adapter that allows Better Auth to use InstantDB as its database.
 
