@@ -30,7 +30,7 @@ First you need to add the InstantDB Adapter to your Better Auth config.
 #### auth.ts
 ```typescript
 import { betterAuth } from "better-auth"
-import { instantDBAdapter } from "better-auth-instantdb"
+import { instantAdapter } from "better-auth-instantdb"
 import { init } from "@instantdb/admin"
 import schema from "@/instant.schema"
 
