@@ -124,7 +124,7 @@ export const instantAdapter = ({
   usePlural = true,
   debugLogs = false
 }: InstantAdapterConfig) => {
-  return createAdapterFactory({
+  const adapterFactory = createAdapterFactory({
     config: {
       customIdGenerator: id,
       adapterId: "instantdb-adapter", // A unique identifier for the adapter.
@@ -342,6 +342,42 @@ export const instantAdapter = ({
       }
     }
   })
+
+  return ((options) => {
+    const adapter = adapterFactory(options)
+    const findOne = adapter.findOne.bind(adapter)
+
+    return {
+      ...adapter,
+      findOne: async (params: Parameters<typeof adapter.findOne>[0]) => {
+        const result = await findOne<Record<string, any>>(params)
+
+        // better-auth's findSession passes `join: { user: true }` and expects
+        // `result.user` to be populated. Without this, sessions silently fail
+        // to refresh and get cleared after the cookie cache `updateAge` window
+        // (24h by default).
+        if (
+          params.model === "session" &&
+          params.join?.user &&
+          result &&
+          !result.user &&
+          result.userId
+        ) {
+          const user = await findOne({
+            model: "user",
+            where: [{ field: "id", value: result.userId }]
+          })
+
+          return {
+            ...result,
+            user
+          }
+        }
+
+        return result
+      }
+    }
+  }) as ReturnType<typeof createAdapterFactory>
 }
 
 async function fetchEntities({
