@@ -5,6 +5,14 @@ import dts from "vite-plugin-dts"
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 
+const external = [
+  /^better-auth(\/.*)?$/,
+  /^@better-auth\/[^/]+(\/.*)?$/,
+  /^@instantdb\/[^/]+(\/.*)?$/,
+  /^react(-dom)?(\/.*)?$/,
+  /^node:/
+]
+
 export default defineConfig({
   plugins: [
     dts({
@@ -18,7 +26,7 @@ export default defineConfig({
       fileName: "index"
     },
     rollupOptions: {
-      external: ["react", "react-dom", "node:util"]
+      external
     }
   },
   resolve: {
